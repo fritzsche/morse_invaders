@@ -124,6 +124,18 @@ export class GameLoop {
         if (currentSymbol) {
           this.morseState = 'PLAY_SYMBOL';
           this.morseTimer = 0;
+          // Immediately start playing - no waiting for next frame
+          this.isPlayingSymbol = true;
+          this.currentSymbolDuration = currentSymbol === '.' ?
+            timing.dotDuration : timing.dotDuration * 3;
+          activeInvader.playingSymbolIndex = activeInvader.currentSymbolIndex;
+          if (this.game.audioEnabled) {
+            if (currentSymbol === '.') {
+              this.audioEngine.playDot();
+            } else {
+              this.audioEngine.playDash();
+            }
+          }
         }
         break;
 
