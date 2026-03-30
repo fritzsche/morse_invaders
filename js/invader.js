@@ -14,6 +14,7 @@ export class Invader {
     this.isDestroyed = false;
     this.isActive = false; // currently spelling morse
     this.hasPlayedFullMorse = false; // track if we've shown the full morse code
+    this.playingSymbolIndex = -1; // index of symbol currently being played (-1 = none)
   }
 
   // Get the current symbol being spelled (dot or dash)
@@ -25,15 +26,19 @@ export class Invader {
   }
 
   // Get the morse code to display
-  // During playback shows what's been played so far
-  // After full letter played, shows complete morse code
+  // Only shows symbols that have STARTED being played (before current)
+  // The currently playing symbol is not shown until it completes
   get displayedMorse() {
     // If we've completed the full morse at least once, show all
     if (this.hasPlayedFullMorse) {
       return this.morseCode;
     }
-    // Otherwise show what's been played (0 to currentSymbolIndex + 1)
-    return this.morseCode.substring(0, this.currentSymbolIndex + 1);
+    // If currently playing, show only symbols BEFORE the playing one
+    if (this.playingSymbolIndex >= 0) {
+      return this.morseCode.substring(0, this.playingSymbolIndex);
+    }
+    // Nothing playing yet
+    return '';
   }
 
   // Advance to next symbol in the morse code
@@ -52,6 +57,7 @@ export class Invader {
   resetMorse() {
     this.currentSymbolIndex = 0;
     this.isActive = false;
+    this.playingSymbolIndex = -1;
     // Keep hasPlayedFullMorse true so morse stays visible
   }
 

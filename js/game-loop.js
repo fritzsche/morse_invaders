@@ -124,6 +124,9 @@ export class GameLoop {
           this.currentSymbolDuration = currentSymbol === '.' ?
             timing.dotDuration : timing.dotDuration * 3;
 
+          // Mark which symbol is playing (for display)
+          activeInvader.playingSymbolIndex = activeInvader.currentSymbolIndex;
+
           // Play the tone
           if (this.game.audioEnabled) {
             if (currentSymbol === '.') {
@@ -139,6 +142,7 @@ export class GameLoop {
           // Symbol finished
           this.isPlayingSymbol = false;
           this.morseTimer = 0;
+          activeInvader.playingSymbolIndex = -1; // clear playing indicator
 
           // Move to next symbol or end of letter
           if (!activeInvader.advanceSymbol()) {
