@@ -198,12 +198,12 @@ export class Renderer {
 
     // Character selection grid - A-Z + 0-9 + punctuation
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?=';
-    const btnWidth = 26;
-    const btnHeight = 22;
-    const btnSpacing = 4;
+    const btnWidth = 24;
+    const btnHeight = 18;
+    const btnSpacing = 3;
     const cols = 19;
     const startX = (this.width - (cols * (btnWidth + btnSpacing) - btnSpacing)) / 2;
-    const gridY = 155;
+    const gridY = 165;
 
     for (let i = 0; i < chars.length; i++) {
       const col = i % cols;
@@ -240,7 +240,7 @@ export class Renderer {
     }
 
     // WPM control
-    const wpmY = 340;
+    const wpmY = 270;
     this.ctx.fillStyle = '#ffffff';
     this.ctx.font = '16px monospace';
     this.ctx.textAlign = 'center';
@@ -285,7 +285,7 @@ export class Renderer {
     this.ctx.fillText(`${wpm} WPM`, this.width / 2, wpmBoxY + wpmBoxHeight / 2 + 7);
 
     // Audio toggle
-    const audioY = 410;
+    const audioY = 330;
     this.audioButton = { x: this.width / 2 - 60, y: audioY, width: 120, height: 35 };
     this.ctx.fillStyle = audioEnabled ? '#00ff00' : '#ff0000';
     this.ctx.fillRect(this.audioButton.x, this.audioButton.y, this.audioButton.width, this.audioButton.height);
@@ -303,7 +303,7 @@ export class Renderer {
     this.ctx.fillText(`Morse ${showMorseCode ? 'ON' : 'OFF'}`, this.width / 2, morseY + 23);
 
     // Start button
-    const startY = morseY + 55;
+    const startY = morseY + 50;
     this.startButton = { x: this.width / 2 - 100, y: startY, width: 200, height: 45 };
     this.ctx.fillStyle = '#00ff00';
     this.ctx.fillRect(this.startButton.x, this.startButton.y, this.startButton.width, this.startButton.height);
