@@ -19,6 +19,7 @@ export class Game {
     this.typedBuffer = '';
     this.audioEnabled = true;
     this.showMorseCode = true; // show/hide morse code display
+    this.audioEngine = null; // set by GameLoop
     this.player = {
       x: GameConfig.CANVAS_WIDTH / 2,
       y: GameConfig.CANVAS_HEIGHT - 50,
@@ -136,18 +137,34 @@ export class Game {
     );
   }
 
-  // Activate the lowest invader for morse spelling
+  // Get all living invaders at the lowest row (highest Y)
+  getLowestRow() {
+    const living = this.invaders.filter(inv => !inv.isDestroyed);
+    if (living.length === 0) return [];
+
+    // Find the maximum Y (lowest row)
+    const maxY = Math.max(...living.map(inv => inv.y));
+    // Return all invaders at that Y level
+    return living.filter(inv => inv.y === maxY);
+  }
+
+  // Activate a random invader from the lowest row for morse spelling
   activateLowestInvader() {
     // Deactivate current active invader
     if (this.activeInvader) {
       this.activeInvader.resetMorse();
     }
 
-    this.activeInvader = this.getLowestInvader();
-    if (this.activeInvader) {
-      this.activeInvader.isActive = true;
-      this.activeInvader.currentSymbolIndex = 0;
+    const lowestRow = this.getLowestRow();
+    if (lowestRow.length === 0) {
+      this.activeInvader = null;
+      return;
     }
+
+    // Pick a random invader from the lowest row
+    this.activeInvader = lowestRow[Math.floor(Math.random() * lowestRow.length)];
+    this.activeInvader.isActive = true;
+    this.activeInvader.currentSymbolIndex = 0;
   }
 
   // Get current movement speed based on level and remaining invaders
@@ -234,6 +251,11 @@ export class Game {
 
     // Create explosion at invader position
     this.explosions.push(new ExplosionAnimation(invader.x, invader.y));
+
+    // Play explosion sound to fill gap before next morse starts
+    if (this.audioEnabled && this.audioEngine) {
+      this.audioEngine.playExplosion();
+    }
 
     // Add score
     this.score += GameConfig.POINTS_PER_INVADER;

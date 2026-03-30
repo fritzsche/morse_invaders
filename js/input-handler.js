@@ -139,24 +139,25 @@ export class InputHandler {
       return;
     }
 
-    if (e.key.match(/^[a-zA-Z0-9]$/)) {
+    if (e.key.match(/^[a-zA-Z0-9.,?=]$/)) {
       const typed = e.key.toUpperCase();
 
       // Only accept letters that are in our learned set and have morse code
       if (!MORSE_CODE[typed]) return;
 
+      // Must have an active invader to shoot
+      const activeInvader = this.game.activeInvader;
+      if (!activeInvader) return;
+
       this.game.typedBuffer += typed;
 
-      // Find the lowest invader with this letter
-      const targetInvader = this.game.getLowestInvaderForLetter(typed);
-
-      if (targetInvader) {
-        // Correct letter - fire laser!
-        this.game.fireLaser(targetInvader);
+      if (typed === activeInvader.letter) {
+        // Correct letter - fire laser at the active invader!
+        this.game.fireLaser(activeInvader);
         this.game.typedBuffer = '';
       } else {
-        // Wrong letter (no invader with this letter)
-        this.game.typedBuffer = this.game.typedBuffer.slice(0, -1); // remove just typed
+        // Wrong letter - buzzer!
+        this.game.typedBuffer = this.game.typedBuffer.slice(0, -1);
         this.triggerWrongFeedback();
       }
     }

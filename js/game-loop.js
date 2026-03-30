@@ -6,6 +6,7 @@ export class GameLoop {
     this.game = game;
     this.renderer = renderer;
     this.audioEngine = audioEngine;
+    this.game.audioEngine = audioEngine; // wire up Game's audio reference
     this.lastTime = 0;
     this.animationId = null;
 
