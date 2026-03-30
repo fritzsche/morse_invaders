@@ -18,8 +18,8 @@ export class GameLoop {
     this.spaceTimer = 0;
     this.morseState = 'IDLE'; // IDLE, PLAY_SYMBOL, SYMBOL_SPACE, LETTER_SPACE
     this.waitingForStart = true;
-    this.startDelay = 100; // ms delay before first invader starts (very short)
     this.isFirstInvader = true; // flag for first invader of wave
+    this.waitingForLetterRepeat = false; // flag: true after first letter, for 1s gap on repeat
 
     this.resetMorseState();
   }
@@ -102,7 +102,12 @@ export class GameLoop {
     // Check if we need to wait before starting (short delay after becoming active or after completing a letter)
     if (this.waitingForStart) {
       this.morseTimer += deltaTime;
-      const waitDuration = this.isFirstInvader ? 100 : 200; // first invader almost instant, others very short
+      let waitDuration = 200; // default short delay
+      if (this.waitingForLetterRepeat) {
+        waitDuration = 1000; // letter repetition - give user time to type
+      } else if (this.isFirstInvader) {
+        waitDuration = 100; // first invader of wave - almost instant
+      }
       if (this.morseTimer >= waitDuration) {
         this.waitingForStart = false;
         this.isFirstInvader = false; // next invader gets short delay instead
@@ -179,6 +184,7 @@ export class GameLoop {
           activeInvader.currentSymbolIndex = 0;
           this.morseTimer = 0;
           this.waitingForStart = true; // Wait before starting again
+          this.waitingForLetterRepeat = true; // mark that first letter is done, now repeating
           this.morseState = 'IDLE';
         }
         break;
@@ -191,6 +197,7 @@ export class GameLoop {
     this.isPlayingSpace = false;
     this.morseState = 'IDLE';
     this.waitingForStart = true; // Wait before starting
+    this.waitingForLetterRepeat = false; // will be set true after first letter completes
   }
 
   render() {
