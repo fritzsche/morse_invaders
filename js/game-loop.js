@@ -54,17 +54,20 @@ export class GameLoop {
   update(deltaTime) {
     if (this.game.state !== GameState.PLAYING) return;
 
+    // If dying, only update explosions and handle death sequence
+    if (this.game.isDying) {
+      this.game.updateExplosions(deltaTime);
+      this.game.updateDeathSequence(deltaTime);
+      return;
+    }
+
     // Update invaders descent
     this.game.updateInvaders(deltaTime);
 
     // Check if invaders reached bottom
     if (this.game.checkInvadersReachedBottom()) {
-      if (this.game.lives <= 0) {
-        this.game.state = GameState.GAME_OVER;
-      } else {
-        // Reset invaders for new life
-        this.game.spawnWave();
-      }
+      // Death sequence started in checkInvadersReachedBottom
+      return; // isDying flag is now set
     }
 
     // Update morse spelling
@@ -215,8 +218,10 @@ export class GameLoop {
       this.renderer.drawInvader(invader, this.game.showMorseCode);
     }
 
-    // Draw player
-    this.renderer.drawPlayer(this.game.player);
+    // Draw player (not when dying)
+    if (!this.game.isDying) {
+      this.renderer.drawPlayer(this.game.player);
+    }
 
     // Draw lasers
     for (const laser of this.game.lasers) {

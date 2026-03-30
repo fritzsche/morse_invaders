@@ -186,4 +186,35 @@ export class MorseAudioEngine {
 
     noise.start(now);
   }
+
+  // Player death sound - dramatic descending explosion
+  playPlayerDeath() {
+    if (!this.enabled || !this.audioContext) return;
+
+    const durationSec = 0.5;
+
+    // Descending oscillator
+    const osc = this.audioContext.createOscillator();
+    const oscGain = this.audioContext.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.value = 200;
+
+    osc.connect(oscGain);
+    oscGain.connect(this.masterGain);
+
+    const now = this.audioContext.currentTime;
+
+    // Descending pitch
+    osc.frequency.setValueAtTime(200, now);
+    osc.frequency.exponentialRampToValueAtTime(50, now + durationSec);
+
+    // Envelope
+    oscGain.gain.setValueAtTime(0, now);
+    oscGain.gain.setValueAtTime(0.5, now + 0.01);
+    oscGain.gain.exponentialRampToValueAtTime(0.01, now + durationSec);
+
+    osc.start(now);
+    osc.stop(now + durationSec + 0.01);
+  }
 }

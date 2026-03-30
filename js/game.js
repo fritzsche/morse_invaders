@@ -1,7 +1,7 @@
 import { GameConfig, GameState, DEFAULT_LEARNED_CHARS, MORSE_CODE } from './constants.js';
 import { Invader } from './invader.js';
 import { Laser } from './laser.js';
-import { ExplosionAnimation } from './explosion.js';
+import { ExplosionAnimation, PlayerExplosionAnimation } from './explosion.js';
 
 // Game class - manages game state and logic
 export class Game {
@@ -31,6 +31,11 @@ export class Game {
     // Invader group movement (classic Space Invaders style)
     this.invaderDirection = 1; // 1 = right, -1 = left
     this.initialInvaderCount = 0;
+
+    // Player death state
+    this.isDying = false;
+    this.deathPauseTimer = 0;
+    this.deathPauseDuration = 60; // frames to pause after death (~1 second)
 
     // Load saved settings
     this.loadSettings();
@@ -82,6 +87,8 @@ export class Game {
     this.activeInvader = null;
     this.typedBuffer = '';
     this.player.x = GameConfig.CANVAS_WIDTH / 2;
+    this.isDying = false;
+    this.deathPauseTimer = 0;
   }
 
   // Spawn a wave of invaders
@@ -238,15 +245,58 @@ export class Game {
 
   // Check if any invader reached the bottom
   checkInvadersReachedBottom() {
-    const bottomLine = GameConfig.CANVAS_HEIGHT - 100;
+    // Death line at player's cannon top edge (player.y is center, subtract half height for top)
+    const playerTop = this.player.y - this.player.height / 2;
 
     for (const invader of this.invaders) {
-      if (!invader.isDestroyed && invader.y >= bottomLine) {
-        this.lives--;
-        return true;
+      if (!invader.isDestroyed) {
+        const invaderBottom = invader.y + invader.height / 2;
+        if (invaderBottom >= playerTop) {
+          console.log(`[Game] Invader reached player! invader.y=${invader.y} invaderBottom=${invaderBottom} playerTop=${playerTop}`);
+          this.lives--;
+          // Start player death sequence
+          this.isDying = true;
+          this.deathPauseTimer = 0;
+
+          // Play player death sound
+          if (this.audioEnabled && this.audioEngine) {
+            this.audioEngine.playPlayerDeath();
+          }
+
+          // Create player explosion at player position
+          this.explosions.push(new PlayerExplosionAnimation(this.player.x, this.player.y));
+
+          // Stop all morse audio
+          if (this.audioEngine) {
+            this.audioEngine.stopAll();
+          }
+
+          return true;
+        }
       }
     }
     return false;
+  }
+
+  // Handle death sequence update (called from game loop)
+  updateDeathSequence(deltaTime) {
+    if (!this.isDying) return;
+
+    // Convert frame count to approximate time-based pause (60fps assumption)
+    if (this.deathPauseTimer >= this.deathPauseDuration) {
+      this.isDying = false;
+      this.deathPauseTimer = 0;
+
+      if (this.lives <= 0) {
+        this.state = GameState.GAME_OVER;
+      } else {
+        // Respawn - reset player position and invaders
+        this.player.x = GameConfig.CANVAS_WIDTH / 2;
+        this.spawnWave();
+      }
+    } else {
+      this.deathPauseTimer++;
+    }
   }
 
   // Check if wave is cleared
