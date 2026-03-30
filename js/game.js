@@ -20,6 +20,7 @@ export class Game {
     this.audioEnabled = true;
     this.showMorseCode = true; // show/hide morse code display
     this.audioEngine = null; // set by GameLoop
+    this.newWave = false; // set true when wave starts, cleared by game-loop
     this.player = {
       x: GameConfig.CANVAS_WIDTH / 2,
       y: GameConfig.CANVAS_HEIGHT - 50,
@@ -90,13 +91,15 @@ export class Game {
     this.activeInvader = null;
     this.invaderDirection = 1; // Reset to moving right
 
-    const startX = (GameConfig.CANVAS_WIDTH - (GameConfig.INVADER_COLS - 1) * GameConfig.INVADER_SPACING_X) / 2;
+    // Level-based column count: 3 at level 1, up to 5 at level 3+
+    const cols = Math.min(5, Math.max(3, 1 + this.level));
+    const startX = (GameConfig.CANVAS_WIDTH - (cols - 1) * GameConfig.INVADER_SPACING_X) / 2;
     const startY = GameConfig.INVADER_START_Y;
 
     const types = ['type1', 'type2', 'type3'];
 
     for (let row = 0; row < GameConfig.INVADER_ROWS; row++) {
-      for (let col = 0; col < GameConfig.INVADER_COLS; col++) {
+      for (let col = 0; col < cols; col++) {
         const letter = this.learnedCharacters[
           Math.floor(Math.random() * this.learnedCharacters.length)
         ];
@@ -109,6 +112,7 @@ export class Game {
     }
 
     this.initialInvaderCount = this.invaders.length;
+    this.newWave = true; // signal game-loop that new wave started
 
     // Activate the lowest invader for morse spelling
     this.activateLowestInvader();

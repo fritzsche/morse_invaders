@@ -18,6 +18,8 @@ export class GameLoop {
     this.spaceTimer = 0;
     this.morseState = 'IDLE'; // IDLE, PLAY_SYMBOL, SYMBOL_SPACE, LETTER_SPACE
     this.waitingForStart = true;
+    this.startDelay = 100; // ms delay before first invader starts (very short)
+    this.isFirstInvader = true; // flag for first invader of wave
 
     this.resetMorseState();
   }
@@ -76,6 +78,12 @@ export class GameLoop {
   }
 
   updateMorseSpelling(deltaTime) {
+    // Check if new wave started - reset first invader flag
+    if (this.game.newWave) {
+      this.game.newWave = false;
+      this.isFirstInvader = true;
+    }
+
     const activeInvader = this.game.activeInvader;
     if (!activeInvader || activeInvader.isDestroyed) {
       const previousInvader = this.game.activeInvader;
@@ -91,12 +99,13 @@ export class GameLoop {
     const timing = this.audioEngine.timing;
     if (!timing) return;
 
-    // Check if we need to wait before starting (delay after becoming active or after completing a letter)
+    // Check if we need to wait before starting (short delay after becoming active or after completing a letter)
     if (this.waitingForStart) {
       this.morseTimer += deltaTime;
-      const waitDuration = 1000; // 1 second delay before starting to spell
+      const waitDuration = this.isFirstInvader ? 100 : 200; // first invader almost instant, others very short
       if (this.morseTimer >= waitDuration) {
         this.waitingForStart = false;
+        this.isFirstInvader = false; // next invader gets short delay instead
         this.morseTimer = 0;
         this.isPlayingSymbol = false;
         this.isPlayingSpace = false;

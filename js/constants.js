@@ -54,7 +54,7 @@ export const GameConfig = {
   INVADER_HORIZONTAL_SPEED: 1.0, // pixels per frame at 60fps (normalized via deltaTime)
   INVADER_DROP_AMOUNT: 25, // pixels to drop when hitting edge
   INVADER_MARGIN: 40, // margin from screen edges
-  SPEED_INCREASE_PER_LEVEL: 0.2, // speed multiplier increase per level
+  SPEED_INCREASE_PER_LEVEL: 0.22, // speed multiplier increase per level
   POINTS_PER_INVADER: 100,
   WAVE_CLEAR_BONUS: 500,
   INITIAL_LIVES: 3,

@@ -162,7 +162,7 @@ export class Renderer {
     this.ctx.fillStyle = '#00ff00';
     this.ctx.textAlign = 'center';
     this.ctx.font = 'bold 24px monospace';
-    this.ctx.fillText(`TYPE: ${typedBuffer}`, this.width / 2, this.height - 20);
+    this.ctx.fillText(typedBuffer, this.width / 2, this.height - 20);
   }
 
   // Draw red flash for wrong answer
@@ -195,6 +195,11 @@ export class Renderer {
     this.ctx.fillStyle = '#888888';
     this.ctx.font = '14px monospace';
     this.ctx.fillText('Click letters/numbers to select learned characters', this.width / 2, 130);
+
+    // Instructions
+    this.ctx.fillStyle = '#666666';
+    this.ctx.font = '12px monospace';
+    this.ctx.fillText('Type the letter shown below the invader to shoot. ESC to end game.', this.width / 2, 145);
 
     // Character selection grid - A-Z + 0-9 + punctuation
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?=';
