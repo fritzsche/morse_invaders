@@ -1,6 +1,9 @@
-# Morse Code Space Invaders
+# Morse Invaders
 
-A single-page web app game to learn Morse code, inspired by classic Space Invaders.
+A single-page web app game to learn Morse code.
+
+## Main Host
+https://fritzsche.github.io/morse_invaders
 
 ## Current Status
 
