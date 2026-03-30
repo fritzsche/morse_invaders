@@ -58,7 +58,7 @@ export class Invader {
     this.currentSymbolIndex = 0;
     this.isActive = false;
     this.playingSymbolIndex = -1;
-    // Keep hasPlayedFullMorse true so morse stays visible
+    this.hasPlayedFullMorse = false; // reset so morse animates fresh when reactivated
   }
 
   // Check if a point is within this invader's bounds

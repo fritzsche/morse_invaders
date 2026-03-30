@@ -169,6 +169,8 @@ export class Game {
     this.activeInvader = lowestRow[Math.floor(Math.random() * lowestRow.length)];
     this.activeInvader.isActive = true;
     this.activeInvader.currentSymbolIndex = 0;
+    this.activeInvader.playingSymbolIndex = -1; // ensure nothing playing
+    this.activeInvader.hasPlayedFullMorse = false; // start fresh
   }
 
   // Get current movement speed based on level and remaining invaders
