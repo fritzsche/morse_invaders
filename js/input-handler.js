@@ -73,6 +73,17 @@ export class InputHandler {
       return;
     }
 
+    // Check Morse Code display toggle button
+    if (this.renderer.morseButton &&
+        x >= this.renderer.morseButton.x &&
+        x <= this.renderer.morseButton.x + this.renderer.morseButton.width &&
+        y >= this.renderer.morseButton.y &&
+        y <= this.renderer.morseButton.y + this.renderer.morseButton.height) {
+      this.game.showMorseCode = !this.game.showMorseCode;
+      this.game.saveSettings();
+      return;
+    }
+
     // Check start button
     if (this.renderer.startButton &&
         x >= this.renderer.startButton.x &&

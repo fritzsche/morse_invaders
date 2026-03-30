@@ -184,7 +184,8 @@ export class GameLoop {
       this.renderer.drawMenu(
         this.game.learnedCharacters,
         this.game.wpm,
-        this.game.audioEnabled
+        this.game.audioEnabled,
+        this.game.showMorseCode
       );
       return;
     }
@@ -199,7 +200,7 @@ export class GameLoop {
 
     // Draw invaders
     for (const invader of this.game.invaders) {
-      this.renderer.drawInvader(invader);
+      this.renderer.drawInvader(invader, this.game.showMorseCode);
     }
 
     // Draw player

@@ -18,12 +18,17 @@ export class Game {
     this.activeInvader = null;
     this.typedBuffer = '';
     this.audioEnabled = true;
+    this.showMorseCode = true; // show/hide morse code display
     this.player = {
       x: GameConfig.CANVAS_WIDTH / 2,
       y: GameConfig.CANVAS_HEIGHT - 50,
       width: 33,
       height: 24
     };
+
+    // Invader group movement (classic Space Invaders style)
+    this.invaderDirection = 1; // 1 = right, -1 = left
+    this.initialInvaderCount = 0;
 
     // Load saved settings
     this.loadSettings();
@@ -34,7 +39,8 @@ export class Game {
     const settings = {
       wpm: this.wpm,
       learnedCharacters: this.learnedCharacters,
-      audioEnabled: this.audioEnabled
+      audioEnabled: this.audioEnabled,
+      showMorseCode: this.showMorseCode
     };
     localStorage.setItem('morseInvaderSettings', JSON.stringify(settings));
   }
@@ -53,6 +59,9 @@ export class Game {
         }
         if (typeof settings.audioEnabled === 'boolean') {
           this.audioEnabled = settings.audioEnabled;
+        }
+        if (typeof settings.showMorseCode === 'boolean') {
+          this.showMorseCode = settings.showMorseCode;
         }
       }
     } catch (e) {
@@ -78,6 +87,7 @@ export class Game {
     this.invaders = [];
     this.lasers = [];
     this.activeInvader = null;
+    this.invaderDirection = 1; // Reset to moving right
 
     const startX = (GameConfig.CANVAS_WIDTH - (GameConfig.INVADER_COLS - 1) * GameConfig.INVADER_SPACING_X) / 2;
     const startY = GameConfig.INVADER_START_Y;
@@ -96,6 +106,8 @@ export class Game {
         this.invaders.push(new Invader(x, y, letter, type));
       }
     }
+
+    this.initialInvaderCount = this.invaders.length;
 
     // Activate the lowest invader for morse spelling
     this.activateLowestInvader();
@@ -138,23 +150,60 @@ export class Game {
     }
   }
 
-  // Get descent speed based on current level
-  getDescentSpeed() {
-    return GameConfig.BASE_DESCENT_SPEED +
-           (this.level - 1) * GameConfig.SPEED_INCREASE_PER_LEVEL;
+  // Get current movement speed based on level and remaining invaders
+  // Classic Space Invaders: fewer invaders = faster movement
+  getInvaderSpeed() {
+    const livingCount = this.invaders.filter(inv => !inv.isDestroyed).length;
+    const levelMultiplier = 1 + (this.level - 1) * GameConfig.SPEED_INCREASE_PER_LEVEL;
+
+    // Speed increases as invaders are destroyed (fewer to animate)
+    const destructionFactor = this.initialInvaderCount / Math.max(livingCount, 1);
+
+    return GameConfig.INVADER_HORIZONTAL_SPEED * levelMultiplier * Math.sqrt(destructionFactor);
   }
 
-  // Update all invaders (descent)
+  // Update all invaders - classic side-to-side movement
   // deltaTime is in milliseconds, normalize to 60fps (16.67ms per frame)
   updateInvaders(deltaTime) {
-    const baseSpeed = this.getDescentSpeed();
-    // Normalize speed to 60fps
-    const normalizedDelta = deltaTime / 16.67;
-    const speed = baseSpeed * normalizedDelta;
+    const livingInvaders = this.invaders.filter(inv => !inv.isDestroyed);
+    if (livingInvaders.length === 0) return;
 
-    for (const invader of this.invaders) {
-      if (!invader.isDestroyed) {
-        invader.y += speed;
+    const normalizedDelta = deltaTime / 16.67;
+    const speed = this.getInvaderSpeed() * normalizedDelta;
+
+    // Find the leftmost and rightmost living invaders
+    let leftMost = null;
+    let rightMost = null;
+    for (const invader of livingInvaders) {
+      if (!leftMost || invader.x < leftMost.x) leftMost = invader;
+      if (!rightMost || invader.x > rightMost.x) rightMost = invader;
+    }
+
+    // Check if we need to reverse direction
+    const margin = GameConfig.INVADER_MARGIN;
+    const leftEdge = leftMost ? leftMost.x - leftMost.width / 2 : margin;
+    const rightEdge = rightMost ? rightMost.x + rightMost.width / 2 : GameConfig.CANVAS_WIDTH - margin;
+
+    let shouldReverse = false;
+
+    if (this.invaderDirection > 0 && rightEdge >= GameConfig.CANVAS_WIDTH - margin) {
+      // Moving right and hit right edge
+      shouldReverse = true;
+    } else if (this.invaderDirection < 0 && leftEdge <= margin) {
+      // Moving left and hit left edge
+      shouldReverse = true;
+    }
+
+    if (shouldReverse) {
+      // Drop down and reverse
+      this.invaderDirection *= -1;
+      for (const invader of livingInvaders) {
+        invader.y += GameConfig.INVADER_DROP_AMOUNT;
+      }
+    } else {
+      // Move sideways
+      for (const invader of livingInvaders) {
+        invader.x += speed * this.invaderDirection;
       }
     }
   }

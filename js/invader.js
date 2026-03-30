@@ -13,7 +13,7 @@ export class Invader {
     this.currentSymbolIndex = 0;
     this.isDestroyed = false;
     this.isActive = false; // currently spelling morse
-    this.morsePlaying = false;
+    this.hasPlayedFullMorse = false; // track if we've shown the full morse code
   }
 
   // Get the current symbol being spelled (dot or dash)
@@ -24,8 +24,15 @@ export class Invader {
     return this.morseCode[this.currentSymbolIndex];
   }
 
-  // Get the morse code displayed so far
+  // Get the morse code to display
+  // During playback shows what's been played so far
+  // After full letter played, shows complete morse code
   get displayedMorse() {
+    // If we've completed the full morse at least once, show all
+    if (this.hasPlayedFullMorse) {
+      return this.morseCode;
+    }
+    // Otherwise show what's been played (0 to currentSymbolIndex + 1)
     return this.morseCode.substring(0, this.currentSymbolIndex + 1);
   }
 
@@ -36,7 +43,8 @@ export class Invader {
       this.currentSymbolIndex++;
       return true;
     }
-    // Finished spelling - reset for next time this invader becomes active
+    // Finished spelling - mark that we've played the full morse
+    this.hasPlayedFullMorse = true;
     return false;
   }
 
@@ -44,7 +52,7 @@ export class Invader {
   resetMorse() {
     this.currentSymbolIndex = 0;
     this.isActive = false;
-    this.morsePlaying = false;
+    // Keep hasPlayedFullMorse true so morse stays visible
   }
 
   // Check if a point is within this invader's bounds

@@ -14,6 +14,7 @@ export class Renderer {
     this.wpmButtons = { up: null, down: null };
     this.startButton = null;
     this.audioButton = null;
+    this.morseButton = null;
 
     this.setupClickAreas();
   }
@@ -48,16 +49,16 @@ export class Renderer {
   }
 
   // Draw an invader
-  drawInvader(invader) {
+  drawInvader(invader, showMorse = true) {
     if (invader.isDestroyed) return;
 
     const sprite = INVADER_SPRITES[invader.type];
     const color = invader.isActive ? '#ff0000' : '#00ff00';
     this.drawPixelSprite(sprite, invader.x, invader.y, 3, color);
 
-    // Draw morse code above active invader
+    // Draw morse code below active invader (not letter)
     if (invader.isActive) {
-      this.drawMorseDisplay(invader);
+      this.drawMorseDisplay(invader, showMorse);
     }
   }
 
@@ -81,17 +82,49 @@ export class Renderer {
     this.ctx.shadowBlur = 0;
   }
 
-  // Draw morse code display above invader
-  drawMorseDisplay(invader) {
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = '14px monospace';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText(invader.displayedMorse, invader.x, invader.y - 35);
+  // Draw morse code display BELOW the invader, with dots and dashes on same baseline
+  // Dots are circles, dashes are rectangles - all aligned at bottom
+  drawMorseDisplay(invader, showMorse) {
+    if (!showMorse) return;
 
-    // Draw the target letter
-    this.ctx.fillStyle = '#ff6600';
-    this.ctx.font = 'bold 16px monospace';
-    this.ctx.fillText(invader.letter, invader.x, invader.y - 50);
+    const morse = invader.displayedMorse;
+    if (!morse) return;
+
+    const dotRadius = 4;
+    const dashWidth = 12;
+    const dashHeight = 6;
+    const spacing = 6; // space between symbols
+    const baselineY = invader.y + invader.height / 2 + 15; // below the invader
+
+    // Calculate total width to center the morse code
+    let totalWidth = 0;
+    for (const symbol of morse) {
+      if (symbol === '.') {
+        totalWidth += dotRadius * 2;
+      } else if (symbol === '-') {
+        totalWidth += dashWidth;
+      }
+      totalWidth += spacing;
+    }
+    totalWidth -= spacing; // remove trailing space
+
+    let currentX = invader.x - totalWidth / 2;
+
+    this.ctx.fillStyle = '#ffffff';
+
+    for (const symbol of morse) {
+      if (symbol === '.') {
+        // Draw dot as a circle (filled)
+        this.ctx.beginPath();
+        this.ctx.arc(currentX + dotRadius, baselineY - dotRadius, dotRadius, 0, Math.PI * 2);
+        this.ctx.fill();
+        currentX += dotRadius * 2 + spacing;
+      } else if (symbol === '-') {
+        // Draw dash as a rectangle on the same baseline
+        this.ctx.fillRect(currentX, baselineY - dashHeight, dashWidth, dashHeight);
+        currentX += dashWidth + spacing;
+      }
+    }
   }
 
   // Draw explosion particles
@@ -147,7 +180,7 @@ export class Renderer {
   }
 
   // Draw the menu screen with clickable character selection
-  drawMenu(learnedChars, wpm, audioEnabled) {
+  drawMenu(learnedChars, wpm, audioEnabled, showMorseCode) {
     this.clear();
     this.charButtons = [];
 
@@ -161,26 +194,26 @@ export class Renderer {
     // Subtitle
     this.ctx.fillStyle = '#888888';
     this.ctx.font = '14px monospace';
-    this.ctx.fillText('Click letters to select learned characters', this.width / 2, 130);
+    this.ctx.fillText('Click letters/numbers to select learned characters', this.width / 2, 130);
 
-    // Character selection grid - only letters (A-Z), numbers can be added later
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-    const btnWidth = 28;
-    const btnHeight = 24;
-    const btnSpacing = 6;
-    const cols = 13;
+    // Character selection grid - A-Z + 0-9 + punctuation
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?=';
+    const btnWidth = 26;
+    const btnHeight = 22;
+    const btnSpacing = 4;
+    const cols = 19;
     const startX = (this.width - (cols * (btnWidth + btnSpacing) - btnSpacing)) / 2;
     const gridY = 155;
 
-    for (let i = 0; i < letters.length; i++) {
+    for (let i = 0; i < chars.length; i++) {
       const col = i % cols;
       const row = Math.floor(i / cols);
       const x = startX + col * (btnWidth + btnSpacing);
       const y = gridY + row * (btnHeight + btnSpacing);
-      const isSelected = learnedChars.includes(letters[i]);
+      const isSelected = learnedChars.includes(chars[i]);
 
       this.charButtons.push({
-        char: letters[i],
+        char: chars[i],
         x: x,
         y: y,
         width: btnWidth,
@@ -203,7 +236,7 @@ export class Renderer {
 
       this.ctx.font = 'bold 14px monospace';
       this.ctx.textAlign = 'center';
-      this.ctx.fillText(letters[i], x + btnWidth / 2, y + btnHeight / 2 + 5);
+      this.ctx.fillText(chars[i], x + btnWidth / 2, y + btnHeight / 2 + 5);
     }
 
     // WPM control
@@ -252,7 +285,7 @@ export class Renderer {
     this.ctx.fillText(`${wpm} WPM`, this.width / 2, wpmBoxY + wpmBoxHeight / 2 + 7);
 
     // Audio toggle
-    const audioY = 420;
+    const audioY = 410;
     this.audioButton = { x: this.width / 2 - 60, y: audioY, width: 120, height: 35 };
     this.ctx.fillStyle = audioEnabled ? '#00ff00' : '#ff0000';
     this.ctx.fillRect(this.audioButton.x, this.audioButton.y, this.audioButton.width, this.audioButton.height);
@@ -260,8 +293,17 @@ export class Renderer {
     this.ctx.font = 'bold 16px monospace';
     this.ctx.fillText(`Audio ${audioEnabled ? 'ON' : 'OFF'}`, this.width / 2, audioY + 23);
 
+    // Morse Code display toggle
+    const morseY = audioY + 45;
+    this.morseButton = { x: this.width / 2 - 60, y: morseY, width: 120, height: 35 };
+    this.ctx.fillStyle = showMorseCode ? '#00ff00' : '#ff0000';
+    this.ctx.fillRect(this.morseButton.x, this.morseButton.y, this.morseButton.width, this.morseButton.height);
+    this.ctx.fillStyle = showMorseCode ? '#000000' : '#ffffff';
+    this.ctx.font = 'bold 14px monospace';
+    this.ctx.fillText(`Morse ${showMorseCode ? 'ON' : 'OFF'}`, this.width / 2, morseY + 23);
+
     // Start button
-    const startY = 490;
+    const startY = morseY + 55;
     this.startButton = { x: this.width / 2 - 100, y: startY, width: 200, height: 45 };
     this.ctx.fillStyle = '#00ff00';
     this.ctx.fillRect(this.startButton.x, this.startButton.y, this.startButton.width, this.startButton.height);

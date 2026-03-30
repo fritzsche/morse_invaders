@@ -35,7 +35,11 @@ export const MORSE_CODE = {
   '6': '-....',
   '7': '--...',
   '8': '---..',
-  '9': '----.'
+  '9': '----.',
+  '.': '.-.-.-',
+  ',': '--..--',
+  '?': '..--..',
+  '=': '-...-'
 };
 
 // Game configuration
@@ -44,15 +48,17 @@ export const GameConfig = {
   CANVAS_HEIGHT: 600,
   INVADER_ROWS: 2,
   INVADER_COLS: 4,
-  INVADER_SPACING_X: 100,
-  INVADER_SPACING_Y: 60,
+  INVADER_SPACING_X: 70,
+  INVADER_SPACING_Y: 50,
   INVADER_START_Y: 80,
-  BASE_DESCENT_SPEED: 0.5, // pixels per second at 60fps (normalized via deltaTime)
-  SPEED_INCREASE_PER_LEVEL: 0.15,
+  INVADER_HORIZONTAL_SPEED: 1.0, // pixels per frame at 60fps (normalized via deltaTime)
+  INVADER_DROP_AMOUNT: 25, // pixels to drop when hitting edge
+  INVADER_MARGIN: 40, // margin from screen edges
+  SPEED_INCREASE_PER_LEVEL: 0.2, // speed multiplier increase per level
   POINTS_PER_INVADER: 100,
   WAVE_CLEAR_BONUS: 500,
   INITIAL_LIVES: 3,
-  LASER_SPEED: 12,
+  LASER_SPEED: 10,
   MORSE_TONE_FREQUENCY: 700,
   ENVELOPE_TIME_MS: 5
 };

@@ -60,8 +60,13 @@ export const GameConfig = {
   CANVAS_HEIGHT: 600,
   INVADER_ROWS: 2,
   INVADER_COLS: 4,
-  BASE_DESCENT_SPEED: 0.5,
-  SPEED_INCREASE_PER_LEVEL: 0.15,
+  INVADER_SPACING_X: 70,
+  INVADER_SPACING_Y: 50,
+  INVADER_START_Y: 80,
+  INVADER_HORIZONTAL_SPEED: 1.0,
+  INVADER_DROP_AMOUNT: 25,
+  INVADER_MARGIN: 40,
+  SPEED_INCREASE_PER_LEVEL: 0.2,
   POINTS_PER_INVADER: 100,
   WAVE_CLEAR_BONUS: 500,
   INITIAL_LIVES: 3
@@ -247,6 +252,13 @@ Wire everything together, create instances, start game.
 ### Letter Targeting Rule
 - When player types a letter, only the **lowest alive invader with that letter** can be hit
 - This prevents confusion and enforces the "read the morse, know the letter" mechanic
+
+### Invader Movement (Classic Space Invaders Pattern)
+- Invaders move **side to side as a group** (not straight down)
+- When the group reaches a screen edge, ALL invaders **drop down** and **reverse direction**
+- This is significantly slower than straight descent, giving players more time
+- Movement speed increases as invaders are destroyed (fewer sprites to animate)
+- Speed also increases with level
 
 ### Wrong Answer Feedback
 - **Buzzer sound**: play immediately on wrong keypress
