@@ -166,11 +166,13 @@ export class Game {
     }
 
     // Pick a random invader from the lowest row
-    this.activeInvader = lowestRow[Math.floor(Math.random() * lowestRow.length)];
-    this.activeInvader.isActive = true;
-    this.activeInvader.currentSymbolIndex = 0;
-    this.activeInvader.playingSymbolIndex = -1; // ensure nothing playing
-    this.activeInvader.hasPlayedFullMorse = false; // start fresh
+    const newInvader = lowestRow[Math.floor(Math.random() * lowestRow.length)];
+
+    // Full reset of the new invader's morse state
+    newInvader.resetMorse();
+    newInvader.isActive = true;
+
+    this.activeInvader = newInvader;
   }
 
   // Get current movement speed based on level and remaining invaders

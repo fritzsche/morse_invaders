@@ -86,13 +86,9 @@ export class GameLoop {
 
     const activeInvader = this.game.activeInvader;
     if (!activeInvader || activeInvader.isDestroyed) {
-      const previousInvader = this.game.activeInvader;
       this.game.activateLowestInvader();
-
-      // Only reset morse state if we actually switched to a different invader
-      if (this.game.activeInvader !== previousInvader) {
-        this.resetMorseState();
-      }
+      // Always reset morse state when switching/activating invader
+      this.resetMorseState();
       return;
     }
 
