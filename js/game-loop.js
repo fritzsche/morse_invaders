@@ -84,8 +84,11 @@ export class GameLoop {
       this.isFirstInvader = true;
     }
 
-    const activeInvader = this.game.activeInvader;
-    if (!activeInvader || activeInvader.isDestroyed) {
+    // Get current invader reference - save it locally to prevent changes mid-function
+    const invader = this.game.activeInvader;
+    if (!invader || invader.isDestroyed) {
+      console.log('[Morse] Invader destroyed or null, activating new');
+      this.audioEngine.stopAll();
       this.game.activateLowestInvader();
       // Always reset morse state when switching/activating invader
       this.resetMorseState();
@@ -116,62 +119,41 @@ export class GameLoop {
       }
     }
 
-    const currentSymbol = activeInvader.currentSymbol;
+    // Get current symbol - this is the one we're working with
+    const currentSymbol = invader.currentSymbol;
+    if (!currentSymbol) return; // Safety check
 
     // State machine for morse spelling
     switch (this.morseState) {
       case 'IDLE':
-        if (currentSymbol) {
-          this.morseState = 'PLAY_SYMBOL';
-          this.morseTimer = 0;
-          // Immediately start playing - no waiting for next frame
-          this.isPlayingSymbol = true;
-          this.currentSymbolDuration = currentSymbol === '.' ?
-            timing.dotDuration : timing.dotDuration * 3;
-          activeInvader.playingSymbolIndex = activeInvader.currentSymbolIndex;
-          if (this.game.audioEnabled) {
-            if (currentSymbol === '.') {
-              this.audioEngine.playDot();
-            } else {
-              this.audioEngine.playDash();
-            }
+        console.log(`[Morse] IDLE → PLAY_SYMBOL: letter="${invader.letter}" morse="${invader.morseCode}" idx=${invader.currentSymbolIndex} sym=${currentSymbol} audio=${this.game.audioEnabled}`);
+        this.morseState = 'PLAY_SYMBOL';
+        this.morseTimer = 0;
+        this.isPlayingSymbol = true;
+        this.currentSymbolDuration = currentSymbol === '.' ?
+          timing.dotDuration : timing.dotDuration * 3;
+        invader.playingSymbolIndex = invader.currentSymbolIndex;
+        if (this.game.audioEnabled) {
+          if (currentSymbol === '.') {
+            this.audioEngine.playDot();
+          } else {
+            this.audioEngine.playDash();
           }
         }
         break;
 
       case 'PLAY_SYMBOL':
-        if (!this.isPlayingSymbol) {
-          // Start playing a symbol
-          this.isPlayingSymbol = true;
-          this.currentSymbolDuration = currentSymbol === '.' ?
-            timing.dotDuration : timing.dotDuration * 3;
-
-          // Mark which symbol is playing (for display)
-          activeInvader.playingSymbolIndex = activeInvader.currentSymbolIndex;
-
-          // Play the tone
-          if (this.game.audioEnabled) {
-            if (currentSymbol === '.') {
-              this.audioEngine.playDot();
-            } else {
-              this.audioEngine.playDash();
-            }
-          }
-        }
-
         this.morseTimer += deltaTime;
         if (this.morseTimer >= this.currentSymbolDuration) {
           // Symbol finished
           this.isPlayingSymbol = false;
           this.morseTimer = 0;
-          activeInvader.playingSymbolIndex = -1; // clear playing indicator
+          invader.playingSymbolIndex = -1;
 
           // Move to next symbol or end of letter
-          if (!activeInvader.advanceSymbol()) {
-            // No more symbols - letter complete
+          if (!invader.advanceSymbol()) {
             this.morseState = 'LETTER_SPACE';
           } else {
-            // More symbols - inter-symbol space
             this.morseState = 'SYMBOL_SPACE';
           }
         }
@@ -181,18 +163,18 @@ export class GameLoop {
         this.morseTimer += deltaTime;
         if (this.morseTimer >= timing.symbolSpace) {
           this.morseTimer = 0;
-          this.morseState = 'PLAY_SYMBOL';
+          this.morseState = 'IDLE';
         }
         break;
 
       case 'LETTER_SPACE':
         this.morseTimer += deltaTime;
         if (this.morseTimer >= timing.letterSpace) {
-          // Reset to beginning and wait before repeating
-          activeInvader.currentSymbolIndex = 0;
+          invader.currentSymbolIndex = 0;
+          invader.playingSymbolIndex = -1;
           this.morseTimer = 0;
-          this.waitingForStart = true; // Wait before starting again
-          this.waitingForLetterRepeat = true; // mark that first letter is done, now repeating
+          this.waitingForStart = true;
+          this.waitingForLetterRepeat = true;
           this.morseState = 'IDLE';
         }
         break;
@@ -200,6 +182,7 @@ export class GameLoop {
   }
 
   resetMorseState() {
+    console.log('[Morse] resetMorseState called');
     this.morseTimer = 0;
     this.isPlayingSymbol = false;
     this.isPlayingSpace = false;

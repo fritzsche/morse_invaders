@@ -156,17 +156,20 @@ export class Game {
   activateLowestInvader() {
     // Deactivate current active invader
     if (this.activeInvader) {
+      console.log(`[Game] Deactivating invader: letter="${this.activeInvader.letter}"`);
       this.activeInvader.resetMorse();
     }
 
     const lowestRow = this.getLowestRow();
     if (lowestRow.length === 0) {
+      console.log('[Game] No invaders left');
       this.activeInvader = null;
       return;
     }
 
     // Pick a random invader from the lowest row
     const newInvader = lowestRow[Math.floor(Math.random() * lowestRow.length)];
+    console.log(`[Game] Activating invader: letter="${newInvader.letter}" morse="${newInvader.morseCode}" from ${lowestRow.length} in lowest row`);
 
     // Full reset of the new invader's morse state
     newInvader.resetMorse();
@@ -253,6 +256,7 @@ export class Game {
 
   // Shoot an invader (laser hits)
   shootInvader(invader) {
+    console.log(`[Game] SHOOT: letter="${invader.letter}" morse="${invader.morseCode}" idx=${invader.currentSymbolIndex} active=${invader.isActive}`);
     // Mark invader as destroyed
     invader.isDestroyed = true;
     invader.isActive = false;
@@ -262,6 +266,7 @@ export class Game {
 
     // Play explosion sound to fill gap before next morse starts
     if (this.audioEnabled && this.audioEngine) {
+      console.log('[Game] Playing explosion sound');
       this.audioEngine.playExplosion();
     }
 

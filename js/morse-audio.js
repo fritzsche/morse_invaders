@@ -1,7 +1,8 @@
 import { GameConfig } from './constants.js';
 import { MorseTiming } from './morse-timing.js';
 
-// MorseAudioEngine - Web Audio API for morse code sounds with raised cosine envelope
+// MorseAudioEngine - Web Audio API for morse code sounds using AudioBufferSourceNode
+// This approach allows clean stop() when switching invaders
 export class MorseAudioEngine {
   constructor() {
     this.audioContext = null;
@@ -10,6 +11,7 @@ export class MorseAudioEngine {
     this.envelopeTime = GameConfig.ENVELOPE_TIME_MS; // ms for attack/release
     this.timing = null;
     this.enabled = true;
+    this.currentSource = null; // current AudioBufferSourceNode for morse tones
   }
 
   init(wpm = 15) {
@@ -18,100 +20,103 @@ export class MorseAudioEngine {
     this.masterGain.connect(this.audioContext.destination);
     this.masterGain.gain.value = 0.5;
     this.timing = new MorseTiming(wpm);
+
+    // Pre-generate tone buffers for dot and dash
+    this._generateToneBuffers();
+  }
+
+  // Generate pre-computed tone buffers with envelope
+  _generateToneBuffers() {
+    if (!this.timing || !this.audioContext) return;
+
+    this.dotBuffer = this._createToneBuffer(this.frequency, this.timing.dotDuration);
+    this.dashBuffer = this._createToneBuffer(this.frequency, this.timing.dotDuration * 3);
+  }
+
+  // Create a single tone buffer with raised cosine envelope
+  _createToneBuffer(frequency, durationMs) {
+    const sampleRate = this.audioContext.sampleRate;
+    const length = Math.ceil(sampleRate * (durationMs / 1000));
+    const buffer = this.audioContext.createBuffer(1, length, sampleRate);
+    const data = buffer.getChannelData(0);
+
+    const durationSec = durationMs / 1000;
+    const rampTime = this.envelopeTime / 1000;
+    const volume = 0.3;
+
+    for (let i = 0; i < length; i++) {
+      const t = i / sampleRate;
+
+      // Raised cosine envelope
+      let envelope;
+      if (t < rampTime) {
+        // Attack phase
+        envelope = (1 - Math.cos(Math.PI * t / rampTime)) / 2;
+      } else if (t > durationSec - rampTime) {
+        // Release phase
+        const releaseT = durationSec - t;
+        envelope = (1 - Math.cos(Math.PI * releaseT / rampTime)) / 2;
+      } else {
+        // Sustain phase
+        envelope = 1.0;
+      }
+
+      data[i] = Math.sin(2 * Math.PI * frequency * t) * envelope * volume;
+    }
+
+    return buffer;
   }
 
   setWpm(wpm) {
     this.timing = new MorseTiming(wpm);
+    this._generateToneBuffers(); // Regenerate buffers with new timing
   }
 
   setEnabled(enabled) {
     this.enabled = enabled;
   }
 
-  // Raised cosine envelope: (1 - cos(π * t / T)) / 2 for t in [0, T]
-  // This creates a smooth ramp up/down to prevent key clicks
-  _getEnvelopeValue(t, rampTime) {
-    if (t <= 0) return 0;
-    if (t >= rampTime) return 1;
-    return (1 - Math.cos(Math.PI * t / rampTime)) / 2;
-  }
-
-  // Play a tone with raised cosine envelope shaping
-  playTone(durationMs, frequency = null) {
-    if (!this.enabled || !this.audioContext) return;
-
-    try {
-      const freq = frequency || this.frequency;
-      const durationSec = durationMs / 1000;
-      const rampTimeSec = this.envelopeTime / 1000;
-      const volume = 0.3;
-
-      const oscillator = this.audioContext.createOscillator();
-      const gainNode = this.audioContext.createGain();
-
-      oscillator.type = 'sine';
-      oscillator.frequency.value = freq;
-
-      oscillator.connect(gainNode);
-      gainNode.connect(this.masterGain);
-
-      const now = this.audioContext.currentTime;
-
-      // Attack phase - raised cosine ramp up
-      gainNode.gain.setValueAtTime(0, now);
-      const attackSamples = Math.ceil(rampTimeSec * 1000); // 1ms resolution
-      if (attackSamples < 1) attackSamples = 1;
-      for (let i = 0; i <= attackSamples; i++) {
-        const t = (i / attackSamples) * rampTimeSec;
-        const envelope = this._getEnvelopeValue(t, rampTimeSec);
-        gainNode.gain.setValueAtTime(envelope * volume, now + t);
+  // Stop all currently playing audio - clean stop using AudioBufferSourceNode.stop()
+  stopAll() {
+    if (this.currentSource) {
+      try {
+        console.log('[Audio] Stopping current source');
+        this.currentSource.stop();
+      } catch (e) {
+        // Already stopped or not started
       }
-
-      // Sustain phase - hold at full volume
-      gainNode.gain.setValueAtTime(volume, now + rampTimeSec);
-
-      // Release phase - raised cosine ramp down
-      const releaseStart = durationSec - rampTimeSec;
-      gainNode.gain.setValueAtTime(volume, now + releaseStart);
-      for (let i = 1; i <= attackSamples; i++) {
-        const t = (i / attackSamples) * rampTimeSec;
-        const envelope = this._getEnvelopeValue(rampTimeSec - t, rampTimeSec);
-        gainNode.gain.setValueAtTime(envelope * volume, now + releaseStart + t);
-      }
-
-      // Ensure it ends at 0
-      gainNode.gain.setValueAtTime(0, now + durationSec);
-
-      oscillator.start(now);
-      oscillator.stop(now + durationSec + 0.01);
-    } catch (e) {
-      console.warn('Audio error:', e);
+      this.currentSource = null;
     }
   }
 
   playDot() {
-    if (this.timing) {
-      this.playTone(this.timing.dotDuration);
-    }
+    if (!this.enabled || !this.timing || !this.dotBuffer) return;
+    console.log(`[Audio] PLAY DOT: duration=${this.timing.dotDuration}ms`);
+
+    // Stop any currently playing tone first
+    this.stopAll();
+
+    this.currentSource = this.audioContext.createBufferSource();
+    this.currentSource.buffer = this.dotBuffer;
+    this.currentSource.connect(this.masterGain);
+    this.currentSource.start();
   }
 
   playDash() {
-    if (this.timing) {
-      this.playTone(this.timing.dotDuration * 3);
-    }
-  }
+    if (!this.enabled || !this.timing || !this.dashBuffer) return;
+    console.log(`[Audio] PLAY DASH: duration=${this.timing.dotDuration * 3}ms`);
 
-  // Play inter-symbol silence (between dots and dashes)
-  playSymbolSpace() {
-    if (this.timing && this.enabled) {
-      const delay = this.timing.symbolSpace;
-      // Small click-less pause
-      const now = this.audioContext ? this.audioContext.currentTime : 0;
-      // Just a small silent gap - no sound needed
-    }
+    // Stop any currently playing tone first
+    this.stopAll();
+
+    this.currentSource = this.audioContext.createBufferSource();
+    this.currentSource.buffer = this.dashBuffer;
+    this.currentSource.connect(this.masterGain);
+    this.currentSource.start();
   }
 
   // Wrong answer buzzer - harsh 150Hz square wave
+  // Uses oscillator approach since we don't need to stop it mid-play
   playBuzzer() {
     if (!this.enabled || !this.audioContext) return;
 
@@ -138,6 +143,7 @@ export class MorseAudioEngine {
   }
 
   // Explosion sound - low frequency boom with noise
+  // Uses oscillator + noise buffer approach
   playExplosion() {
     if (!this.enabled || !this.audioContext) return;
 
