@@ -188,8 +188,7 @@ export class Renderer {
     this.ctx.fillStyle = '#00ff00';
     this.ctx.font = 'bold 36px monospace';
     this.ctx.textAlign = 'center';
-    this.ctx.fillText('MORSE CODE', this.width / 2, 60);
-    this.ctx.fillText('SPACE INVADERS', this.width / 2, 100);
+    this.ctx.fillText('MORSE INVADERS', this.width / 2, 60);
 
     // Subtitle
     this.ctx.fillStyle = '#888888';
