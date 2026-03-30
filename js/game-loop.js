@@ -85,6 +85,8 @@ export class GameLoop {
     if (this.game.newWave) {
       this.game.newWave = false;
       this.isFirstInvader = true;
+      // Reset morse state to ensure clean start for new wave
+      this.resetMorseState();
     }
 
     // Get current invader reference - save it locally to prevent changes mid-function
@@ -93,7 +95,11 @@ export class GameLoop {
       console.log('[Morse] Invader destroyed or null, activating new');
       this.audioEngine.stopAll();
       this.game.activateLowestInvader();
-      // Always reset morse state when switching/activating invader
+      // Reset morse state machine to ensure fresh start
+      // Critical: must reset morseState and morseTimer to prevent
+      // advanceSymbol() from being called immediately on the new invader
+      this.morseState = 'IDLE';
+      this.morseTimer = 0;
       this.resetMorseState();
       return;
     }
