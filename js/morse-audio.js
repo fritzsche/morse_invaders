@@ -118,6 +118,7 @@ export class MorseAudioEngine {
   // Wrong answer buzzer - harsh 150Hz square wave
   // Uses oscillator approach since we don't need to stop it mid-play
   playBuzzer() {
+    this.stopAll();        
     if (!this.enabled || !this.audioContext) return;
 
     const durationSec = 0.2;
@@ -145,6 +146,7 @@ export class MorseAudioEngine {
   // Explosion sound - low frequency boom with noise
   // Uses oscillator + noise buffer approach
   playExplosion() {
+    this.stopAll();    
     if (!this.enabled || !this.audioContext) return;
 
     const durationSec = 0.3;

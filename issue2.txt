@@ -1,0 +1,24 @@
+morse-audio.js:94 [Audio] PLAY DOT: duration=120ms
+20:14:14.319 morse-audio.js:83 [Audio] Stopping current source
+20:14:14.568 game.js:309 [Game] SHOOT: letter="I" morse=".." idx=1 active=true
+20:14:14.568 game.js:319 [Game] Playing explosion sound
+20:14:14.569 game.js:166 [Game] Deactivating invader: letter="I"
+20:14:14.569 game.js:179 [Game] Activating invader: letter="L" morse=".-.." from 1 in lowest row
+20:14:14.585 game-loop.js:138 [Morse] IDLE → PLAY_SYMBOL: letter="L" morse=".-.." idx=0 sym=. audio=true
+20:14:14.585 morse-audio.js:94 [Audio] PLAY DOT: duration=120ms
+20:14:14.585 morse-audio.js:83 [Audio] Stopping current source
+20:14:14.852 game-loop.js:138 [Morse] IDLE → PLAY_SYMBOL: letter="L" morse=".-.." idx=1 sym=- audio=true
+20:14:14.852 morse-audio.js:107 [Audio] PLAY DASH: duration=360ms
+20:14:14.852 morse-audio.js:83 [Audio] Stopping current source
+20:14:15.352 game-loop.js:138 [Morse] IDLE → PLAY_SYMBOL: letter="L" morse=".-.." idx=2 sym=. audio=true
+20:14:15.352 morse-audio.js:94 [Audio] PLAY DOT: duration=120ms
+20:14:15.352 morse-audio.js:83 [Audio] Stopping current source
+20:14:15.618 game-loop.js:138 [Morse] IDLE → PLAY_SYMBOL: letter="L" morse=".-.." idx=3 sym=. audio=true
+20:14:15.618 morse-audio.js:94 [Audio] PLAY DOT: duration=120ms
+20:14:15.618 morse-audio.js:83 [Audio] Stopping current source
+20:14:17.118 game-loop.js:138 [Morse] IDLE → PLAY_SYMBOL: letter="L" morse=".-.." idx=0 sym=. audio=true
+20:14:17.118 morse-audio.js:94 [Audio] PLAY DOT: duration=120ms
+20:14:17.118 morse-audio.js:83 [Audio] Stopping current source
+20:14:17.385 game-loop.js:138 [Morse] IDLE → PLAY_SYMBOL: letter="L" morse=".-.." idx=1 sym=- audio=true
+20:14:17.386 morse-audio.js:107 [Audio] PLAY DASH: duration=360ms
+20:14:17.386 morse-audio.js:83 [Audio] Stopping current source
