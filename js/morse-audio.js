@@ -1,124 +1,100 @@
 import { GameConfig } from './constants.js';
 import { MorseTiming } from './morse-timing.js';
 
-// MorseAudioEngine - Web Audio API for morse code sounds using AudioBufferSourceNode
-// This approach allows clean stop() when switching invaders
+// MorseAudioEngine - Web Audio API for morse code sounds
+// Dot/dash tones are played via AudioWorkletProcessor (morse-worklet-processor.js)
+// for sample-accurate timing on the audio thread.
+// Non-morse sounds (buzzer, explosion, playerDeath) use oscillator nodes as before.
 export class MorseAudioEngine {
   constructor() {
     this.audioContext = null;
     this.masterGain = null;
     this.frequency = GameConfig.MORSE_TONE_FREQUENCY;
-    this.envelopeTime = GameConfig.ENVELOPE_TIME_MS; // ms for attack/release
+    this.envelopeTime = GameConfig.ENVELOPE_TIME_MS;
     this.timing = null;
     this.enabled = true;
-    this.currentSource = null; // current AudioBufferSourceNode for morse tones
+
+    // Worklet state
+    this.workletNode = null;
+    this.workletReady = false;
+    this._stopAckResolve = null;  // resolve fn waiting for 'stopped' ack
+    this._onWorkletMessage = null; // callback set by GameLoop
   }
 
-  init(wpm = 15) {
+  async init(wpm = 15) {
     this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
     this.masterGain = this.audioContext.createGain();
     this.masterGain.connect(this.audioContext.destination);
     this.masterGain.gain.value = 0.5;
     this.timing = new MorseTiming(wpm);
 
-    // Pre-generate tone buffers for dot and dash
-    this._generateToneBuffers();
-  }
+    // Load the worklet processor module (requires HTTPS or localhost)
+    await this.audioContext.audioWorklet.addModule('./js/morse-worklet-processor.js');
 
-  // Generate pre-computed tone buffers with envelope
-  _generateToneBuffers() {
-    if (!this.timing || !this.audioContext) return;
+    this.workletNode = new AudioWorkletNode(this.audioContext, 'morse-worklet');
+    this.workletNode.connect(this.masterGain);
 
-    this.dotBuffer = this._createToneBuffer(this.frequency, this.timing.dotDuration);
-    this.dashBuffer = this._createToneBuffer(this.frequency, this.timing.dotDuration * 3);
-  }
-
-  // Create a single tone buffer with raised cosine envelope
-  _createToneBuffer(frequency, durationMs) {
-    const sampleRate = this.audioContext.sampleRate;
-    const length = Math.ceil(sampleRate * (durationMs / 1000));
-    const buffer = this.audioContext.createBuffer(1, length, sampleRate);
-    const data = buffer.getChannelData(0);
-
-    const durationSec = durationMs / 1000;
-    const rampTime = this.envelopeTime / 1000;
-    const volume = 0.3;
-
-    for (let i = 0; i < length; i++) {
-      const t = i / sampleRate;
-
-      // Raised cosine envelope
-      let envelope;
-      if (t < rampTime) {
-        // Attack phase
-        envelope = (1 - Math.cos(Math.PI * t / rampTime)) / 2;
-      } else if (t > durationSec - rampTime) {
-        // Release phase
-        const releaseT = durationSec - t;
-        envelope = (1 - Math.cos(Math.PI * releaseT / rampTime)) / 2;
-      } else {
-        // Sustain phase
-        envelope = 1.0;
+    this.workletNode.port.onmessage = (e) => {
+      const msg = e.data;
+      // Resolve any pending stopAll() promise
+      if (msg.type === 'stopped' && this._stopAckResolve) {
+        this._stopAckResolve();
+        this._stopAckResolve = null;
       }
+      // Forward all messages to GameLoop
+      if (this._onWorkletMessage) {
+        this._onWorkletMessage(msg);
+      }
+    };
 
-      data[i] = Math.sin(2 * Math.PI * frequency * t) * envelope * volume;
-    }
-
-    return buffer;
+    this.workletReady = true;
   }
 
   setWpm(wpm) {
     this.timing = new MorseTiming(wpm);
-    this._generateToneBuffers(); // Regenerate buffers with new timing
+    // No worklet interaction needed — next scheduleLetter() will use the new dotUnit
   }
 
   setEnabled(enabled) {
     this.enabled = enabled;
   }
 
-  // Stop all currently playing audio - clean stop using AudioBufferSourceNode.stop()
-  stopAll() {
-    if (this.currentSource) {
-      try {
-        console.log('[Audio] Stopping current source');
-        this.currentSource.stop();
-      } catch (e) {
-        // Already stopped or not started
-      }
-      this.currentSource = null;
-    }
+  // Register a callback that receives all worklet port messages
+  // (symbolStart, symbolEnd, letterComplete, stopped)
+  setWorkletMessageHandler(fn) {
+    this._onWorkletMessage = fn;
   }
 
-  playDot() {
-    if (!this.enabled || !this.timing || !this.dotBuffer) return;
-    console.log(`[Audio] PLAY DOT: duration=${this.timing.dotDuration}ms`);
-
-    // Stop any currently playing tone first
-    this.stopAll();
-
-    this.currentSource = this.audioContext.createBufferSource();
-    this.currentSource.buffer = this.dotBuffer;
-    this.currentSource.connect(this.masterGain);
-    this.currentSource.start();
+  // Send the full morse letter sequence to the worklet for sample-accurate playback
+  scheduleLetter(morseCode, timing) {
+    if (!this.enabled || !this.workletReady || !this.workletNode) return;
+    this.workletNode.port.postMessage({
+      type: 'schedule',
+      morseCode,
+      dotUnit: timing.dotUnit,
+      frequency: this.frequency,
+      volume: 0.3,
+      envelopeMs: this.envelopeTime
+    });
   }
 
-  playDash() {
-    if (!this.enabled || !this.timing || !this.dashBuffer) return;
-    console.log(`[Audio] PLAY DASH: duration=${this.timing.dotDuration * 3}ms`);
+  // Stop all currently playing audio.
+  // Sends 'stop' to the worklet and awaits the 'stopped' ack so callers
+  // can optionally await clean silence. Fire-and-forget (no await) is also safe.
+  async stopAll() {
+    if (!this.workletReady || !this.workletNode) return;
+    // If a stop is already pending, wait for the same promise
+    if (this._stopAckResolve) return;
 
-    // Stop any currently playing tone first
-    this.stopAll();
-
-    this.currentSource = this.audioContext.createBufferSource();
-    this.currentSource.buffer = this.dashBuffer;
-    this.currentSource.connect(this.masterGain);
-    this.currentSource.start();
+    const ackPromise = new Promise(resolve => {
+      this._stopAckResolve = resolve;
+    });
+    this.workletNode.port.postMessage({ type: 'stop' });
+    await ackPromise;
   }
 
   // Wrong answer buzzer - harsh 150Hz square wave
-  // Uses oscillator approach since we don't need to stop it mid-play
   playBuzzer() {
-    this.stopAll();        
     if (!this.enabled || !this.audioContext) return;
 
     const durationSec = 0.2;
@@ -127,13 +103,10 @@ export class MorseAudioEngine {
 
     oscillator.type = 'square';
     oscillator.frequency.value = 150;
-
     oscillator.connect(gainNode);
     gainNode.connect(this.masterGain);
 
     const now = this.audioContext.currentTime;
-
-    // Sharp attack, quick release for harsh buzzer sound
     gainNode.gain.setValueAtTime(0, now);
     gainNode.gain.setValueAtTime(0.2, now + 0.001);
     gainNode.gain.setValueAtTime(0.2, now + durationSec - 0.01);
@@ -144,48 +117,38 @@ export class MorseAudioEngine {
   }
 
   // Explosion sound - low frequency boom with noise
-  // Uses oscillator + noise buffer approach
   playExplosion() {
-    this.stopAll();    
     if (!this.enabled || !this.audioContext) return;
 
     const durationSec = 0.3;
 
-    // Low frequency oscillator for boom
     const osc = this.audioContext.createOscillator();
     const oscGain = this.audioContext.createGain();
-
     osc.type = 'sawtooth';
     osc.frequency.value = 80;
-
     osc.connect(oscGain);
     oscGain.connect(this.masterGain);
 
     const now = this.audioContext.currentTime;
-
-    // Quick boom envelope
     oscGain.gain.setValueAtTime(0, now);
     oscGain.gain.setValueAtTime(0.4, now + 0.01);
     oscGain.gain.exponentialRampToValueAtTime(0.01, now + durationSec);
-
     osc.start(now);
     osc.stop(now + durationSec + 0.01);
 
-    // Add some noise burst
+    // Noise burst
     const bufferSize = this.audioContext.sampleRate * durationSec;
     const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
       data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.1));
     }
-
     const noise = this.audioContext.createBufferSource();
     const noiseGain = this.audioContext.createGain();
     noise.buffer = buffer;
     noise.connect(noiseGain);
     noiseGain.connect(this.masterGain);
     noiseGain.gain.setValueAtTime(0.15, now);
-
     noise.start(now);
   }
 
@@ -195,23 +158,16 @@ export class MorseAudioEngine {
 
     const durationSec = 0.5;
 
-    // Descending oscillator
     const osc = this.audioContext.createOscillator();
     const oscGain = this.audioContext.createGain();
-
     osc.type = 'sawtooth';
     osc.frequency.value = 200;
-
     osc.connect(oscGain);
     oscGain.connect(this.masterGain);
 
     const now = this.audioContext.currentTime;
-
-    // Descending pitch
     osc.frequency.setValueAtTime(200, now);
     osc.frequency.exponentialRampToValueAtTime(50, now + durationSec);
-
-    // Envelope
     oscGain.gain.setValueAtTime(0, now);
     oscGain.gain.setValueAtTime(0.5, now + 0.01);
     oscGain.gain.exponentialRampToValueAtTime(0.01, now + durationSec);

@@ -5,7 +5,7 @@ import { GameLoop } from './game-loop.js';
 import { InputHandler } from './input-handler.js';
 
 // Main entry point - wires everything together
-function init() {
+async function init() {
   // Get canvas
   const canvas = document.getElementById('gameCanvas');
   if (!canvas) {
@@ -18,20 +18,18 @@ function init() {
   const renderer = new Renderer(canvas);
   const audioEngine = new MorseAudioEngine();
 
-  // Initialize audio with loaded WPM setting
-  audioEngine.init(game.wpm);
-  audioEngine.setEnabled(game.audioEnabled);
-
-  // Create game loop (but don't start yet)
+  // Start game loop immediately so the menu renders while the worklet module loads
   const gameLoop = new GameLoop(game, renderer, audioEngine);
-
-  // Create input handler
-  const inputHandler = new InputHandler(game, audioEngine, gameLoop, renderer);
-
-  // Start game loop immediately for continuous menu rendering
   gameLoop.start();
 
-  // Handle first user interaction to enable audio
+  // Initialize audio — async because AudioWorklet.addModule() returns a Promise
+  await audioEngine.init(game.wpm);
+  audioEngine.setEnabled(game.audioEnabled);
+
+  // Create input handler after audio is ready
+  const inputHandler = new InputHandler(game, audioEngine, gameLoop, renderer);
+
+  // Handle first user interaction to enable audio context (browser autoplay policy)
   const enableAudio = () => {
     if (audioEngine.audioContext.state === 'suspended') {
       audioEngine.audioContext.resume();

@@ -11,19 +11,21 @@ export class GameLoop {
     this.animationId = null;
 
     // Morse spelling state
+    // States: 'IDLE' | 'PLAYING_LETTER' | 'LETTER_SPACE_WAIT'
+    // IDLE            → scheduleLetter() called → PLAYING_LETTER
+    // PLAYING_LETTER  → driven by worklet ack messages via _handleWorkletMessage()
+    //                 → on 'letterComplete' → LETTER_SPACE_WAIT
+    // LETTER_SPACE_WAIT → deltaTime wait → IDLE
     this.morseTimer = 0;
-    this.currentSymbolDuration = 0;
-    this.isPlayingSymbol = false;
-    this.isPlayingSpace = false;
-    this.spaceTimer = 0;
-    this.morseState = 'IDLE'; // IDLE, PLAY_SYMBOL, SYMBOL_SPACE, LETTER_SPACE
-    this.waitingForStart = true;
-    this.isFirstInvader = true; // flag for first invader of wave
-    this.waitingForLetterRepeat = false; // flag: true after first letter, for 1s gap on repeat
-    this.lastActiveInvader = null; // tracks invader reference to detect changes
-    this.suppressMorse = false; // silences new tones while laser is in flight
+    this.morseState = 'IDLE';
+    this.waitingForStart = true;       // delay before first schedule after becoming active
+    this.isFirstInvader = true;        // flag for first invader of wave (shorter delay)
+    this.waitingForLetterRepeat = false; // true after first letter (1s gap on repeat)
+    this.lastActiveInvader = null;     // tracks invader reference to detect changes
+    this.suppressMorse = false;        // silences new tones while laser is in flight
 
-    this.resetMorseState();
+    // Wire worklet ack messages to this state machine
+    this.audioEngine.setWorkletMessageHandler((msg) => this._handleWorkletMessage(msg));
   }
 
   start() {
@@ -68,7 +70,6 @@ export class GameLoop {
 
     // Check if invaders reached bottom
     if (this.game.checkInvadersReachedBottom()) {
-      // Death sequence started in checkInvadersReachedBottom
       return; // isDying flag is now set
     }
 
@@ -80,6 +81,36 @@ export class GameLoop {
 
     // Update explosions
     this.game.updateExplosions(deltaTime);
+  }
+
+  // Called by audioEngine when the worklet posts a message.
+  // Updates invader visual state and advances morseState.
+  _handleWorkletMessage(msg) {
+    const invader = this.game.activeInvader;
+    if (!invader || invader.isDestroyed) return;
+
+    switch (msg.type) {
+      case 'symbolStart':
+        invader.playingSymbolIndex = msg.index;
+        break;
+
+      case 'symbolEnd':
+        invader.playingSymbolIndex = -1;
+        invader.currentSymbolIndex = msg.index + 1;
+        break;
+
+      case 'letterComplete':
+        // Guard: ignore stale acks (e.g. after tab was backgrounded)
+        if (this.morseState === 'PLAYING_LETTER') {
+          invader.hasPlayedFullMorse = true;
+          invader.currentSymbolIndex = 0;
+          invader.playingSymbolIndex = -1;
+          this.morseState = 'LETTER_SPACE_WAIT';
+          this.morseTimer = 0;
+          this.waitingForLetterRepeat = true;
+        }
+        break;
+    }
   }
 
   updateMorseSpelling(deltaTime) {
@@ -95,11 +126,12 @@ export class GameLoop {
       if (this.lastActiveInvader !== null) {
         this.audioEngine.stopAll();
         this.lastActiveInvader = null;
+        this.morseState = 'IDLE';
       }
       return;
     }
 
-    // Active invader changed — reset state machine immediately
+    // Active invader changed — stop current audio and reset state machine
     if (invader !== this.lastActiveInvader) {
       this.lastActiveInvader = invader;
       this.suppressMorse = false; // new invader: resume audio
@@ -107,100 +139,54 @@ export class GameLoop {
       this.resetMorseState();
     }
 
-    const timing = this.audioEngine.timing;
-    if (!timing) return;
+    if (!this.audioEngine.timing) return;
 
-    // Check if we need to wait before starting (short delay after becoming active or after completing a letter)
+    // Short delay before scheduling the first (or next) letter.
+    // waitingForLetterRepeat uses 1000ms to give the player time to type.
+    // isFirstInvader uses 100ms (almost instant start to wave).
+    // All other transitions use 200ms.
     if (this.waitingForStart) {
       this.morseTimer += deltaTime;
-      let waitDuration = 200; // default short delay
-      if (this.waitingForLetterRepeat) {
-        waitDuration = 1000; // letter repetition - give user time to type
-      } else if (this.isFirstInvader) {
-        waitDuration = 100; // first invader of wave - almost instant
-      }
-      if (this.morseTimer >= waitDuration) {
-        this.waitingForStart = false;
-        this.isFirstInvader = false; // next invader gets short delay instead
-        this.morseTimer = 0;
-        this.isPlayingSymbol = false;
-        this.isPlayingSpace = false;
-        // Don't return - continue to process
-      } else {
-        return; // Wait before starting
-      }
+      const waitDuration = this.waitingForLetterRepeat ? 1000
+                         : this.isFirstInvader          ? 100
+                         : 200;
+      if (this.morseTimer < waitDuration) return;
+      this.waitingForStart = false;
+      this.isFirstInvader = false;
+      this.morseTimer = 0;
     }
 
-    // Get current symbol - this is the one we're working with
-    const currentSymbol = invader.currentSymbol;
-    if (!currentSymbol) return; // Safety check
-
-    // State machine for morse spelling
     switch (this.morseState) {
       case 'IDLE':
-        console.log(`[Morse] IDLE → PLAY_SYMBOL: letter="${invader.letter}" morse="${invader.morseCode}" idx=${invader.currentSymbolIndex} sym=${currentSymbol} audio=${this.game.audioEnabled}`);
-        this.morseState = 'PLAY_SYMBOL';
-        this.morseTimer = 0;
-        this.isPlayingSymbol = true;
-        this.currentSymbolDuration = currentSymbol === '.' ?
-          timing.dotDuration : timing.dotDuration * 3;
-        invader.playingSymbolIndex = invader.currentSymbolIndex;
-        if (this.game.audioEnabled && !this.suppressMorse) {
-          if (currentSymbol === '.') {
-            this.audioEngine.playDot();
-          } else {
-            this.audioEngine.playDash();
-          }
+        // Schedule the full letter on the worklet and wait for ack messages
+        if (!this.suppressMorse && this.game.audioEnabled) {
+          this.audioEngine.scheduleLetter(invader.morseCode, this.audioEngine.timing);
         }
+        this.morseState = 'PLAYING_LETTER';
         break;
 
-      case 'PLAY_SYMBOL':
-        this.morseTimer += deltaTime;
-        if (this.morseTimer >= this.currentSymbolDuration) {
-          // Symbol finished
-          this.isPlayingSymbol = false;
-          this.morseTimer = 0;
-          invader.playingSymbolIndex = -1;
-
-          // Move to next symbol or end of letter
-          if (!invader.advanceSymbol()) {
-            this.morseState = 'LETTER_SPACE';
-          } else {
-            this.morseState = 'SYMBOL_SPACE';
-          }
-        }
+      case 'PLAYING_LETTER':
+        // Entirely driven by _handleWorkletMessage — nothing to poll here
         break;
 
-      case 'SYMBOL_SPACE':
+      case 'LETTER_SPACE_WAIT':
+        // Wait between repetitions (already entered via _handleWorkletMessage letterComplete)
         this.morseTimer += deltaTime;
-        if (this.morseTimer >= timing.symbolSpace) {
+        if (this.morseTimer >= (this.waitingForLetterRepeat ? 1000 : 200)) {
           this.morseTimer = 0;
+          this.waitingForLetterRepeat = false;
           this.morseState = 'IDLE';
-        }
-        break;
-
-      case 'LETTER_SPACE':
-        this.morseTimer += deltaTime;
-        if (this.morseTimer >= timing.letterSpace) {
-          invader.currentSymbolIndex = 0;
-          invader.playingSymbolIndex = -1;
-          this.morseTimer = 0;
-          this.waitingForStart = true;
-          this.waitingForLetterRepeat = true;
-          this.morseState = 'IDLE';
+          // Let IDLE fire on the very next tick (waitingForStart was cleared above)
         }
         break;
     }
   }
 
   resetMorseState() {
-    console.log('[Morse] resetMorseState called');
     this.morseTimer = 0;
-    this.isPlayingSymbol = false;
-    this.isPlayingSpace = false;
     this.morseState = 'IDLE';
-    this.waitingForStart = true; // Wait before starting
-    this.waitingForLetterRepeat = false; // will be set true after first letter completes
+    this.waitingForStart = true;
+    this.waitingForLetterRepeat = false;
   }
 
   render() {
