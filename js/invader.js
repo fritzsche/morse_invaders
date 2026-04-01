@@ -26,19 +26,18 @@ export class Invader {
   }
 
   // Get the morse code to display
-  // Only shows symbols that have STARTED being played (before current)
-  // The currently playing symbol is not shown until it completes
   get displayedMorse() {
-    // If we've completed the full morse at least once, show all
+    // After first full pass, always show complete morse
     if (this.hasPlayedFullMorse) {
       return this.morseCode;
     }
-    // If currently playing, show only symbols BEFORE the playing one
+    // While a symbol is actively playing, show up to and including it
     if (this.playingSymbolIndex >= 0) {
-      return this.morseCode.substring(0, this.playingSymbolIndex);
+      return this.morseCode.substring(0, this.playingSymbolIndex + 1);
     }
-    // Nothing playing yet
-    return '';
+    // Between symbols (spaces): show all symbols completed so far
+    // currentSymbolIndex is the NEXT symbol to play, so it equals the count completed
+    return this.morseCode.substring(0, this.currentSymbolIndex);
   }
 
   // Advance to next symbol in the morse code

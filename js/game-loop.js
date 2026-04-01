@@ -20,6 +20,8 @@ export class GameLoop {
     this.waitingForStart = true;
     this.isFirstInvader = true; // flag for first invader of wave
     this.waitingForLetterRepeat = false; // flag: true after first letter, for 1s gap on repeat
+    this.lastActiveInvader = null; // tracks invader reference to detect changes
+    this.suppressMorse = false; // silences new tones while laser is in flight
 
     this.resetMorseState();
   }
@@ -70,11 +72,11 @@ export class GameLoop {
       return; // isDying flag is now set
     }
 
+    // Update lasers first so a kill is resolved before morse state runs
+    this.game.updateLasers();
+
     // Update morse spelling
     this.updateMorseSpelling(deltaTime);
-
-    // Update lasers
-    this.game.updateLasers();
 
     // Update explosions
     this.game.updateExplosions(deltaTime);
@@ -85,23 +87,24 @@ export class GameLoop {
     if (this.game.newWave) {
       this.game.newWave = false;
       this.isFirstInvader = true;
-      // Reset morse state to ensure clean start for new wave
-      this.resetMorseState();
+      this.lastActiveInvader = null; // force invader-change detection below
     }
 
-    // Get current invader reference - save it locally to prevent changes mid-function
     const invader = this.game.activeInvader;
     if (!invader || invader.isDestroyed) {
-      console.log('[Morse] Invader destroyed or null, activating new');
-      this.audioEngine.stopAll();
-      this.game.activateLowestInvader();
-      // Reset morse state machine to ensure fresh start
-      // Critical: must reset morseState and morseTimer to prevent
-      // advanceSymbol() from being called immediately on the new invader
-      this.morseState = 'IDLE';
-      this.morseTimer = 0;
-      this.resetMorseState();
+      if (this.lastActiveInvader !== null) {
+        this.audioEngine.stopAll();
+        this.lastActiveInvader = null;
+      }
       return;
+    }
+
+    // Active invader changed — reset state machine immediately
+    if (invader !== this.lastActiveInvader) {
+      this.lastActiveInvader = invader;
+      this.suppressMorse = false; // new invader: resume audio
+      this.audioEngine.stopAll();
+      this.resetMorseState();
     }
 
     const timing = this.audioEngine.timing;
@@ -142,7 +145,7 @@ export class GameLoop {
         this.currentSymbolDuration = currentSymbol === '.' ?
           timing.dotDuration : timing.dotDuration * 3;
         invader.playingSymbolIndex = invader.currentSymbolIndex;
-        if (this.game.audioEnabled) {
+        if (this.game.audioEnabled && !this.suppressMorse) {
           if (currentSymbol === '.') {
             this.audioEngine.playDot();
           } else {

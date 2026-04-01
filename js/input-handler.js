@@ -152,7 +152,9 @@ export class InputHandler {
       this.game.typedBuffer += typed;
 
       if (typed === activeInvader.letter) {
-        // Correct letter - fire laser at the active invader!
+        // Correct letter - silence old invader immediately, then fire laser
+        this.audioEngine.stopAll();
+        this.gameLoop.suppressMorse = true;
         this.game.fireLaser(activeInvader);
         this.game.typedBuffer = '';
       } else {
